@@ -1,10 +1,6 @@
-### Pseudo-code of pbft for mac implementation
+###  Pseudo-code of pbft for mac implementation
 
-
-
-**Some Macros:**
-
-
+This implementation based on 《Practical Byzantine Fault Tolerance》signature version.
 
 
 
@@ -29,10 +25,7 @@ view_change_log_entry:
 	int h
 	list<n, d> C
 	list<n,d,v> P
-	list<n,d,v> Q
 	int i
-	list<bool>	acks
-	ack_nums
 ```
 
 
@@ -80,7 +73,7 @@ node:
 	// normal variables
 	I_am																									//number of replicas
 	
-	map<client: client_request_entry> client_request 	
+	map<client: timestamp> client_request 								// for one semantics
   int my_view
  	list<log_entry> log			 															// record logs related 	information
  	int applied																						// apply pointer
@@ -210,9 +203,9 @@ However, `n` is prepared by 1 2 3, `n + 1` is prepared by 2, 3 ,4. In this case,
 
 ### PRE-PREARE phase:
 
-Msg format: ⟨PRE-PREPARE, c, v, n, D(m)⟩αp, v: view, n:sequence number, D(m) digest
+Msg format:  $<PRE-PREPARE, v, n, m⟩_{\sigma_{p}}$  v: view, n:sequence number, D(m) digest
 
-Leader:
+Leader: 
 
 ```
 //check wether h~h+L has slot for this msg format, if no room, ,omit it,retuan,(wait for CHECKPOINT-FETCH or VIEW-CHANGE)
@@ -349,8 +342,6 @@ The main target of view-change is find a new leader, and transmit the work in pr
 
 New leader get information of previous view from cluster, and assign number to them in new term.
 
-TODO how to make leader election? why we need Q?
-
  ⟨VIEW-CHANGE, *v* + 1, *h*, C, P, Q, *i*⟩α*i*
 
 ```
@@ -371,60 +362,6 @@ When a backup finds system can't make progress:
     	if v.status == PRE-PREPARED: v.status = canceled  
 
 	until receive NEW-VIEW msg: multicast(<VIEW-CHANGE, my_view, h, C, P, Q, i>) periodically
-```
-
-##### send VIEW-CHANGE-ACK:
-
-why need d?
-
-Since faulty replicas may send different VIEW-CHANGE msg and truy to break consensus. Leader should check digest. If replica A send VC to B with d, but send VC to Leader with d', leader would not think ACK is right until it receive 2f + 1 ack.
-
-⟨VIEW-CHANGE-ACK,*v*+1,*i*, *j*,*d*⟩μ*ip*：
-
- *i* is the identifier of the sender, *d* is the digest of the VIEW-CHANGE message being acknowledged, and *j* is the replica that sent that VIEW-CHANGE message
-
-all replicas 
-
-```
-assume view change msg = view_change
-when receive view-change msg:
-	check signature
-	// check Q P
-	for <n, d, v> in Q: if v > my_view： return
-	for <n, d, v> in P: if v > my_view: return
-	
-	// normal operations
-	cur_view_change_log = view_change_log(
-			v = view_change.v,
-			h = view_change.h
-			C = view_change.C
-			Q = view_change.Q
-			i = view_change.i
-			acks[I_am = 1, i = 1]
-			ack_nums = 2
-	)
-	send <VIEW-CHANGE-ACK, v + 1, I_am, view_change.i, digest> to leader
-	
-```
-
-
-
-#### when receive VIEW-CHANGE-ACK
-
-⟨VIEW-CHANGE-ACK,*v*+1,*i*, *j*,*d*⟩μ*ip*
-
-Leader:
-
-```
-// check something digest...可以在收到之前进行验证
-when receive VIEW-CHANGE-ACK:
-	if node.view_changes[j].acks[i] == False and node.view_change[j].digest = VIEW-CHANGE-ACK.digest:
-		node.view_changes[j].acks[i] = True
-		node.view_changes[j].ack_nums += 1
-		if view_changes[j].ack_nums >= 2f + 1:
-			node.view_change_num += 1
-	if node.view_change_num >= 2f + 1:
-		start process Decision procedure
 ```
 
 
