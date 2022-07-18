@@ -7,18 +7,20 @@ Get help
 `cargo run -- -h`
 
 ```
+server 0.1.0
+Simple program to greet a person
 
 USAGE:
-    server [OPTIONS]
+    server --ip <IP>
 
 OPTIONS:
-    -h, --help           Print help information
-    -p, --port <PORT>    bind port, default port 2022 [default: 2022]
-    -V, --version        Print version information
+    -h, --help       Print help information
+    -i, --ip <IP>    bind ip:port
+    -V, --version    Print version information
 ```
 
 
 
-Specify port, default is 2022
+Specify ip as same in config servers' ip
 
-`cargo run -- -p 2022`
+`cargo run -- -i 127.0.0.1:2022`
