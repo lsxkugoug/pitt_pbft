@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "pitt_pbft"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,3 +20,11 @@ tokio-util = { version = "0.6", features = ["codec"] }
 static_assertions = "1.1.0"
 serde_json = "1.0"
 tokio-serde = { version = "0.8", features = ["json"] }
+
+hex = "0.3.0"
+p256 = "0.9.0"
+rand_core="0.6.3"
+ring = "0.16.20"
+sha2 = "0.9.8"
+digest = "0.9.0"
+lazy_static = "1.4.0"

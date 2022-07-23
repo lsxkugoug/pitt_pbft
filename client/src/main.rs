@@ -9,6 +9,9 @@ use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 mod constant;
 mod message;
 
+use ring::{rand, signature};
+
+
 #[tokio::main]
 pub async fn main() {
     
@@ -22,7 +25,8 @@ pub async fn main() {
     let mut serialized =
         tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
     print!("send json");
-    let client_request = message::Client_msg{msg_type: constant::CLIENT_REQUEST, operation:"1234".to_string(), time_stamp: "1234".to_string(), signature: vec![1,2,3,4]};
+    let client_request = message::Client_msg{msg_type: constant::CLIENT_REQUEST, operation:"1234".to_string(), time_stamp: "1234".to_string()};
+
     let json_obj = json!(&client_request);
     
     

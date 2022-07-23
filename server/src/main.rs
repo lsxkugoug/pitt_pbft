@@ -1,21 +1,15 @@
-mod cmd;
-mod config;
-mod server;
-mod constant;
-mod consensus;
-
+use pitt_pbft::{consensus::*, server, config, cmd, message, constants};
 use clap::Parser;
-use consensus::*;
-use std::sync::{Arc};
-use tokio::sync::{Mutex};
+use std::sync::{Arc,Mutex};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
 
 use futures::prelude::*;
 use serde_json::Value;
 use tokio_serde::formats::*;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
+
+
 // firstly check config, and return server's number based on config::SERVER_IP
 async fn get_sever_num() -> (i32, String) {
     let args = cmd::Args::parse();
@@ -38,7 +32,7 @@ async fn main(){
     // read public key and my private key todo
 
     if let Err(_) = std::env::var("RUST_LOG") {
-        std::env::set_var("RUST_LOG", "debug");
+        std::env::set_var("RUST_LOG", "info");
     }
     pretty_env_logger::init();
 
@@ -53,13 +47,15 @@ async fn main(){
     };
     log::info!("Listening for requests on {}, and my server number is {}", &bind_ip, i_am);
     
+    constants::init_constants(i_am);
     let server: server::Server = Default::default();
+    // make view change todo
 
     let server_mutex = Arc::new(Mutex::new(server));
     loop {
         // The second item contains the IP and port of the new connection.
         let (mut socket, _) = listener.accept().await.unwrap();
-        let server_mutex = server_mutex.clone();
+        let server_mutex = Arc::clone(&server_mutex);
         tokio::spawn(async move {
             preprocess(socket,server_mutex).await;
         });
@@ -67,16 +63,15 @@ async fn main(){
 }
 
 //parse requests
-async fn preprocess(mut socket: TcpStream, server: Arc<Mutex<server::Server>>) {
+async fn preprocess(mut socket: TcpStream, server_mutex: Arc<Mutex<server::Server>>) {
         // 1. parse incoming request
-        
         let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
         let mut deserialized = tokio_serde::SymmetricallyFramed::new(
             length_delimited,
             SymmetricalJson::<Value>::default(),
         );
 
-        
+        // get msg type abnd do some check
         let msg = match deserialized.try_next().await {
             Ok(msg) => {
                 match msg {
@@ -107,11 +102,26 @@ async fn preprocess(mut socket: TcpStream, server: Arc<Mutex<server::Server>>) {
             },
         };
 
+        // 2. process the job, and check data
         match msg_type {
-            Client_msg => do_client_request(msg, server),
-            Pre_prepare_msg => todo!(),
-            Prepare_msg => todo!(),
-            Commit_msg => todo!(),
+            CLIENT_REQUEST =>{
+                let msg: message::Client_msg = match serde_json::from_value(msg){
+                    Ok(msg) => msg,
+                    Err(msg) => {
+                        log::info!("cant convert to expected msg object, check received msg: {}", msg);
+                        return 
+                    },
+                };
+                if !message::check_client_request(&msg) {
+                    log::info!("signature verification failed");
+                    return;
+                }
+                do_client_request(&msg, server_mutex).await;
+            } 
+            PRE_PREPARE => todo!(),
+            PREPARE => todo!(),
+            COMMIT => todo!(),
+            VIEW_CHANGE => todo!(),
             _ => {
                 log::info!("no match type, stop process this message");
             }

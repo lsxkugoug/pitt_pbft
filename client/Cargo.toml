@@ -19,3 +19,11 @@ tokio-util = { version = "0.6", features = ["codec"] }
 static_assertions = "1.1.0"
 serde_json = "1.0"
 tokio-serde = { version = "0.8", features = ["json"] }
+
+# crypto
+hmac = "0.12.1"
+hex = "0.4.3"
+hex-literal = "0.3.4"
+sha2 = "0.10.2"
+ed25519-dalek = "1.0.1"
+ring = "0.16.20"
