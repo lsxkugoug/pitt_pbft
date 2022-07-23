@@ -7,14 +7,13 @@ use tokio::time::{sleep, Duration};
 
 pub async fn do_client_request(msg: &Client_msg, server_mutex: Arc<Mutex<server::Server>>) {
     print!("successfully enter client request");
-    let who_leader = -1;
-    let I_am = -1;
+    let who_leader = usize::max_value();
     {
         let mut server = server_mutex.lock().unwrap(); 
-        server.client_request[msg.who_send as usize] = (msg.time_stamp.clone(), constants::PRE_PREPARED);
+        server.client_request[msg.who_send] = (msg.time_stamp, constants::PRE_PREPARED);
     }
     // do leader operation
-    if I_am == who_leader {
+    if constants::get_i_am() == who_leader {
         // enter pre prepare
         send_pre_prepare(msg, server_mutex)
     }else {
@@ -24,7 +23,7 @@ pub async fn do_client_request(msg: &Client_msg, server_mutex: Arc<Mutex<server:
         let mut failed = false;
         {
             let mut server = server_mutex.lock().unwrap(); 
-            if server.client_request[msg.who_send as usize].0 == msg.time_stamp && server.client_request[msg.who_send as usize].1 == constants::PRE_PREPARED{
+            if server.client_request[msg.who_send].0 == msg.time_stamp && server.client_request[msg.who_send as usize].1 == constants::PRE_PREPARED{
                  failed = true;
             }
         }
@@ -50,14 +49,14 @@ pub fn send_pre_prepare(msg: &Client_msg, server_mutex: Arc<Mutex<server::Server
             v: server.my_view,
             n: server.h + server.log_assign,
             client: msg.who_send,
-            who_send: server.I_am,
+            who_send: constants::get_i_am(),
             cert_prepare_num: 1,
             cert_prepare_vote: vec![false;  config::SERVER_NUM],
             cert_commit_num: 0,
             cert_commit_vote: vec![false;  config::SERVER_NUM],
         };
         let log_assign = server.log_assign as usize;
-        new_log.cert_prepare_vote[server.I_am as usize] = true; 
+        new_log.cert_prepare_vote[constants::get_i_am()] = true; 
         server.log[log_assign] = new_log;
         server.log_assign += 1;
     }

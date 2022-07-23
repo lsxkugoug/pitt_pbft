@@ -1,12 +1,9 @@
 use p256::ecdsa::{VerifyingKey, SigningKey};
-use std::fmt::format;
-use std::fs;
-use std::fs::File;
-use std::io::Read;
 use crate::{config, cryptography::{self, load_private_key}};
 
+
 // server
-static mut I_AM: Option<&mut usize> = None;
+pub static mut I_AM: usize = usize::max_value();
 
 // message type
 pub const CLIENT_REQUEST: i32 = 1; 
@@ -16,7 +13,7 @@ pub const COMMIT: i32 = 4;
 pub const VIEW_CHANGE: i32 = 5; 
 
 // log status
-pub const PRE_PREPARED: i32 = 1; 
+pub const PRE_PREPARED: i32= 1; 
 pub const PREPARED: i32 = 2; 
 pub const COMMITED: i32 = 3;
 pub const APPLIED: i32 = 4;
@@ -25,35 +22,62 @@ pub const APPLIED: i32 = 4;
 pub const TIMEOUT: u64 = 300;   // when timeout, go to view change
 
 // public key, it initialized after program, little tricky
-static mut CLIENT_PUB: Option<&mut Vec<VerifyingKey>> = None;
-static mut SERVER_PUB: Option<&mut Vec<VerifyingKey>> = None;
-static mut MY_PRIVATE_KEY: Option<&mut SigningKey> = None;
+pub static mut CLIENT_PUB: Vec<VerifyingKey> = Vec::new();
+pub static mut SERVER_PUB: Vec<VerifyingKey> = Vec::new();
+pub static mut MY_PRIVATE_KEY: Option<SigningKey> = None;
 
-
-pub fn init_constants(i_am: usize) {
-    // 1. init public key part constant
-    // 1.1 load client public keys
-    let client_pub = Box::new(Vec::new());
+// this function is used to init server constants. Scalable to future change.
+pub unsafe fn init_constants(i_am: usize) {
+    // 1. init server variable
+    I_AM = i_am;
+    // 2. init key pairs
+    // 2.1 init client public key
     let client_root_path = "./key_pairs/client";
     for i in 0..config::CLIENT_NUM {
         let client_path = format!("{}/{}/{}", client_root_path, i, "pub_key");
-        client_pub.push(cryptography::load_public_key(client_path));
+        CLIENT_PUB.push(cryptography::load_public_key(client_path));
     }
-    // 1.2 load server public keys
-    let server_pub = Box::new(Vec::new());
+    // 2.2 init server public key 
     let server_root_path = "./key_pairs/server";
+
+
+
     for i in 0..config::CLIENT_NUM {
         let client_path = format!("{}/{}/{}", server_root_path, i, "pub_key");
-        server_pub.push(cryptography::load_public_key(client_path));
+        SERVER_PUB.push(cryptography::load_public_key(client_path));
     }
-    // 1.3 load my private key
-    let my_private_key = Box::new(load_private_key(format!("./key_pairs/server/{}/pri_key", i_am)));
-    // 1. init server 
-    let i_am = Box::new(i_am);
-    unsafe {
-        CLIENT_PUB = Some(Box::leak(client_pub));
-        SERVER_PUB = Some(Box::leak(server_pub));
-        MY_PRIVATE_KEY = Some(Box::leak(my_private_key));
-        I_AM = Some(Box::leak(i_am));
-    }
+    // 2.3 init my private key
+    // MY_PRIVATE_KEY = load_private_key(format!("./key_pairs/server/{}/pri_key", i_am));
 }
+
+pub fn get_i_am() -> usize {
+    let mut ret = usize::max_value();
+    unsafe{
+        ret = I_AM;
+    }
+    return ret
+}
+
+
+pub fn get_client_pub(client: usize) -> Option<VerifyingKey>{
+    let mut ret: Option<VerifyingKey> = None;
+    unsafe {
+        ret = Some(SERVER_PUB[client]);
+    }
+    return ret
+}
+pub fn get_server_pub(server: usize) -> Option<VerifyingKey>{
+    let mut ret: Option<VerifyingKey> = None;
+    unsafe {
+        ret = Some(SERVER_PUB[server]);
+    }
+    return ret
+}
+pub fn get_my_prikey() -> Option<SigningKey> {
+    let mut ret: Option<SigningKey> = None;
+    unsafe {
+        ret = Some(load_private_key(format!("./key_pairs/server/{}/pri_key", get_i_am())))
+    }
+    ret
+}
+

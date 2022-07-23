@@ -5,7 +5,7 @@ use serde_json::Result;
 #[derive(Serialize, Deserialize)]
 pub struct Client_msg {
     pub msg_type: i32,
-    pub who_send: i32,
+    pub who_send: usize,
     pub operation: String,
     pub time_stamp: u128,
 }
@@ -19,7 +19,7 @@ pub struct  Client_msg_signature {
 #[derive(Serialize, Deserialize)]
 pub struct Pre_prepare_msg {
     pub client_msg: Client_msg,
-    pub who_send: i32,
+    pub who_send: usize,
     pub v: i32,
     pub n: i32,
     pub signature: Vec<u8>    
@@ -35,7 +35,6 @@ pub struct Prepare_msg {
 #[derive(Serialize, Deserialize)]
 pub struct Commit_msg {
     pub client_msg: i32,
-
 }
 
 pub struct Vc_msg {

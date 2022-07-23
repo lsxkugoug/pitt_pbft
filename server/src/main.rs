@@ -11,17 +11,17 @@ use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
 
 // firstly check config, and return server's number based on config::SERVER_IP
-async fn get_sever_num() -> (i32, String) {
+async fn get_sever_num() -> (usize, String) {
     let args = cmd::Args::parse();
-    let mut i_am: i32 = -1;
+    let mut i_am: usize = usize::max_value();
     let my_ip = args.ip;
     // do some check
     for (idx, ip) in config::SERVER_IP.iter().enumerate() {
         if my_ip == *ip {
-            i_am = idx as i32;
+            i_am = idx;
         }
     };
-    if i_am == -1 {
+    if i_am == usize::max_value() {
         log::error!("check config, the ip of this server is {}, but no record in config file", my_ip);
     }
     return (i_am, my_ip);
@@ -29,6 +29,7 @@ async fn get_sever_num() -> (i32, String) {
 
 #[tokio::main]
 async fn main(){
+    // to do split this part to init server and bind port
     // read public key and my private key todo
 
     if let Err(_) = std::env::var("RUST_LOG") {
@@ -46,8 +47,10 @@ async fn main(){
         }
     };
     log::info!("Listening for requests on {}, and my server number is {}", &bind_ip, i_am);
-    
-    constants::init_constants(i_am);
+    unsafe{
+        constants::init_constants(i_am);
+    }
+
     let server: server::Server = Default::default();
     // make view change todo
 
