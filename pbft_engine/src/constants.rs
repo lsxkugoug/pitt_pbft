@@ -39,15 +39,12 @@ pub unsafe fn init_constants(i_am: usize) {
     }
     // 2.2 init server public key 
     let server_root_path = "./key_pairs/server";
-
-
-
     for i in 0..config::CLIENT_NUM {
         let client_path = format!("{}/{}/{}", server_root_path, i, "pub_key");
         SERVER_PUB.push(cryptography::load_public_key(client_path));
     }
     // 2.3 init my private key
-    // MY_PRIVATE_KEY = load_private_key(format!("./key_pairs/server/{}/pri_key", i_am));
+    MY_PRIVATE_KEY = Some(load_private_key(format!("./key_pairs/server/{}/pri_key", i_am)));
 }
 
 pub fn get_i_am() -> usize {
@@ -62,7 +59,7 @@ pub fn get_i_am() -> usize {
 pub fn get_client_pub(client: usize) -> Option<VerifyingKey>{
     let mut ret: Option<VerifyingKey> = None;
     unsafe {
-        ret = Some(SERVER_PUB[client]);
+        ret = Some(CLIENT_PUB[client]);
     }
     return ret
 }
@@ -81,3 +78,13 @@ pub fn get_my_prikey() -> Option<SigningKey> {
     ret
 }
 
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn initfun_test() {
+        unsafe{
+            super::init_constants(0);
+        }
+
+    }
+}

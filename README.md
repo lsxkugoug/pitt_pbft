@@ -23,4 +23,15 @@ OPTIONS:
 
 Specify ip as same in config servers' ip
 
-`cargo run -- -i 127.0.0.1:2022`
+
+
+Before run the engine, generating public key and server keys is required
+
+Run ``cargo run --bin generate_kp` to generate key pairs.
+
+Then open server
+
+`cargo run --bin pbft_engine -- -i 127.0.0.1:2022`
+
+
+

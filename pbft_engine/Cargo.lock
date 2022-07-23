@@ -828,6 +828,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbft_engine"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "clap",
+ "digest",
+ "env_logger",
+ "futures",
+ "hex",
+ "impls",
+ "lazy_static",
+ "log",
+ "p256",
+ "pretty_env_logger",
+ "public-ip",
+ "rand_core",
+ "ring",
+ "serde",
+ "serde_json",
+ "sha2",
+ "static_assertions",
+ "tokio",
+ "tokio-serde",
+ "tokio-util",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -864,33 +891,6 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
-
-[[package]]
-name = "pitt_pbft"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "clap",
- "digest",
- "env_logger",
- "futures",
- "hex",
- "impls",
- "lazy_static",
- "log",
- "p256",
- "pretty_env_logger",
- "public-ip",
- "rand_core",
- "ring",
- "serde",
- "serde_json",
- "sha2",
- "static_assertions",
- "tokio",
- "tokio-serde",
- "tokio-util",
-]
 
 [[package]]
 name = "pkcs8"

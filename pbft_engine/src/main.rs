@@ -1,4 +1,4 @@
-use pitt_pbft::{consensus::*, server, config, cmd, message, constants};
+use pbft_engine::{consensus::*, server, config, cmd, message, constants};
 use clap::Parser;
 use std::sync::{Arc,Mutex};
 use tokio::net::{TcpListener, TcpStream};
@@ -90,45 +90,32 @@ async fn preprocess(mut socket: TcpStream, server_mutex: Arc<Mutex<server::Serve
                 return;
             },
         };
-
-        let msg_type = match msg.get("msg_type")  {
-            Some(msg_type) => match msg_type.to_string().parse::<i32>() {
-                Ok(msg_type) => msg_type,
-                Err(_) => {
-                    log::info!("cant get correct message type, stop process this message");
-                    return;
-                }
-            },
-            None => {
-                log::info!("cant get correct message type, stop process this message");
+        println!("{}", msg);
+        let msg: message::MsgWithSignature = match serde_json::from_value(msg)  {
+            Ok(msg) => msg,
+            Err(_) => {
+                log::info!("receive bad msg, omit it");
                 return;
             },
         };
-
-        // 2. process the job, and check data
-        match msg_type {
-            CLIENT_REQUEST =>{
-                let msg: message::Client_msg = match serde_json::from_value(msg){
-                    Ok(msg) => msg,
-                    Err(msg) => {
-                        log::info!("cant convert to expected msg object, check received msg: {}", msg);
-                        return 
-                    },
-                };
-                if !message::check_client_request(&msg) {
-                    log::info!("signature verification failed");
-                    return;
-                }
-                do_client_request(&msg, server_mutex).await;
-            } 
-            PRE_PREPARE => todo!(),
-            PREPARE => todo!(),
-            COMMIT => todo!(),
-            VIEW_CHANGE => todo!(),
-            _ => {
-                log::info!("no match type, stop process this message");
-            }
-        }
+        if !message::check_msg(&msg) {
+            log::info!("receive bad msg, omit it");
+            return;            
+        } 
+        log::info!("sig check successful");
+        // // 2. process the job, and check data
+        // match msg.msg_without_sig {
+        //     message::Msg::ClientMsg(msg_without_sig) => {
+        //         do_client_request(&msg, server_mutex).await;
+        //     } 
+        //     PRE_PREPARE => todo!(),
+        //     PREPARE => todo!(),
+        //     COMMIT => todo!(),
+        //     VIEW_CHANGE => todo!(),
+        //     _ => {
+        //         log::info!("no match type, stop process this message");
+        //     }
+        // }
     //
 }
 

@@ -1,4 +1,0 @@
-use crate::cypto;
-fn main() {
-    cypto::generate_key_pairs();
-}

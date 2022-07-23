@@ -5,12 +5,12 @@ use serde_json::Value;
 use crate::{message::*, server, constants, config};
 use tokio::time::{sleep, Duration};
 
-pub async fn do_client_request(msg: &Client_msg, server_mutex: Arc<Mutex<server::Server>>) {
+pub async fn do_client_request(msg: &ClientMsg, server_mutex: Arc<Mutex<server::Server>>) {
     print!("successfully enter client request");
     let who_leader = usize::max_value();
     {
         let mut server = server_mutex.lock().unwrap(); 
-        server.client_request[msg.who_send] = (msg.time_stamp, constants::PRE_PREPARED);
+        server.client_request[msg.who_send] = (msg.time_stamp.clone(), constants::PRE_PREPARED);
     }
     // do leader operation
     if constants::get_i_am() == who_leader {
@@ -34,7 +34,7 @@ pub async fn do_client_request(msg: &Client_msg, server_mutex: Arc<Mutex<server:
 }
 
 // only for leader send pre_prepare msg
-pub fn send_pre_prepare(msg: &Client_msg, server_mutex: Arc<Mutex<server::Server>>) {
+pub fn send_pre_prepare(msg: &ClientMsg, server_mutex: Arc<Mutex<server::Server>>) {
     let mut new_log: server::Log_entry = Default::default();
     {
         let mut server = server_mutex.lock().unwrap(); 

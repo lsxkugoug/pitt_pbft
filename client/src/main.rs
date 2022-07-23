@@ -28,7 +28,7 @@ pub async fn main() {
     let client_request = message::Client_msg{msg_type: constant::CLIENT_REQUEST, operation:"1234".to_string(), time_stamp: "1234".to_string()};
 
     let json_obj = json!(&client_request);
-    
+    bincode::serialize(&client_request).unwrap();
     
     // Send the value
     serialized

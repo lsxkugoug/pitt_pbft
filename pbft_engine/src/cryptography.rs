@@ -108,24 +108,25 @@ mod tests {
         super::generate_key_pairs();
     }
 
-    // #[test]
-    // fn sign_verify_test() {
-    //     // simulate I am 0 server, receive client0's client request
-    //     constants::init_constants(0);
+    #[test]
+    fn sign_verify_test() {
+        // simulate I am 0 server, receive client0's client request
+        unsafe{
+            constants::init_constants(0);   
+        }   
+        // 1. simulate client0 generate request and sign it.
+        use std::time::{Duration, SystemTime};
+        // firstly convert a object to bytes then sign it
+        let send_msg = message::ClientMsg{
+            msg_type: constants::CLIENT_REQUEST,
+            who_send: 0,
+            operation: "this is operation".to_string(),
+            time_stamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string(),
+        };
+        let msg_bytes = bincode::serialize(&send_msg).unwrap();
+        let signature = sign_msg(&constants::get_my_prikey().unwrap(), &msg_bytes);
+        let result = verify_sig(&constants::get_client_pub(0).unwrap(), &msg_bytes, &signature);
+        println!("{}", result);
 
-    //     // 1. simulate client0 generate request and sign it.
-    //     use std::time::{Duration, SystemTime};
-    //     // firstly convert a object to bytes then sign it
-    //     let send_msg = message::Client_msg{
-    //         msg_type: constants::CLIENT_REQUEST,
-    //         who_send: 0,
-    //         operation: "this is operation".to_string(),
-    //         time_stamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
-    //     };
-    //     let msg_bytes = bincode::serialize(&send_msg).unwrap();
-    //     let signature = sign_msg(&load_private_key("/key_pairs/client/0/pri_key".to_string()), &msg_bytes);
-    //     let result = verify_sig(constants::get_client_pub(0), &msg_bytes, &signature);
-        
-
-    // }
+    }
 }
