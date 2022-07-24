@@ -60,13 +60,13 @@ async fn main(){
         let (mut socket, _) = listener.accept().await.unwrap();
         let server_mutex = Arc::clone(&server_mutex);
         tokio::spawn(async move {
-            preprocess(socket,server_mutex).await;
+            preprocess(socket,&server_mutex).await;
         });
     }
 }
 
 //parse requests
-async fn preprocess(mut socket: TcpStream, server_mutex: Arc<Mutex<server::Server>>) {
+async fn preprocess(mut socket: TcpStream, server_mutex: &Arc<Mutex<server::Server>>) {
         // 1. parse incoming request
         let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
         let mut deserialized = tokio_serde::SymmetricallyFramed::new(
@@ -98,24 +98,24 @@ async fn preprocess(mut socket: TcpStream, server_mutex: Arc<Mutex<server::Serve
                 return;
             },
         };
-        if !message::check_msg(&msg) {
+        if !message::check_msg(&msg, server_mutex) {
             log::info!("receive bad msg, omit it");
             return;            
         } 
         log::info!("sig check successful");
-        // // 2. process the job, and check data
-        // match msg.msg_without_sig {
-        //     message::Msg::ClientMsg(msg_without_sig) => {
-        //         do_client_request(&msg, server_mutex).await;
-        //     } 
-        //     PRE_PREPARE => todo!(),
-        //     PREPARE => todo!(),
-        //     COMMIT => todo!(),
-        //     VIEW_CHANGE => todo!(),
-        //     _ => {
-        //         log::info!("no match type, stop process this message");
-        //     }
-        // }
-    //
+        // 2. process the job, and check data
+        match msg.msg_without_sig {
+            message::Msg::ClientMsg(msg_without_sig) => {
+                do_client_request(msg_without_sig, server_mutex, msg.signature).await;
+            },
+            message::Msg::PrePrepareMsg(msg_without_sig)=> todo!(),
+            message::Msg::PrepareMsg(msg_without_sig)=> todo!(),
+            COMMIT => todo!(),
+            VIEW_CHANGE => todo!(),
+            _ => {
+                log::info!("no match type, stop process this message");
+            }
+        }
+    
 }
 

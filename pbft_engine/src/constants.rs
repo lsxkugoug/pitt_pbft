@@ -4,6 +4,9 @@ use crate::{config, cryptography::{self, load_private_key}};
 
 // server
 pub static mut I_AM: usize = usize::max_value();
+pub const NORMAL: i32 = 1; 
+pub const DO_VIEW_CHANGE: i32 = 2; 
+
 
 // message type
 pub const CLIENT_REQUEST: i32 = 1; 
@@ -25,6 +28,11 @@ pub const TIMEOUT: u64 = 300;   // when timeout, go to view change
 pub static mut CLIENT_PUB: Vec<VerifyingKey> = Vec::new();
 pub static mut SERVER_PUB: Vec<VerifyingKey> = Vec::new();
 pub static mut MY_PRIVATE_KEY: Option<SigningKey> = None;
+
+
+
+
+
 
 // this function is used to init server constants. Scalable to future change.
 pub unsafe fn init_constants(i_am: usize) {

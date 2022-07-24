@@ -70,7 +70,7 @@ pub fn load_public_key(path: String) -> VerifyingKey{
     let point = EncodedPoint::from_bytes(&buffer).expect(&format!("read public key: {} wrong", &path));
     VerifyingKey::from_encoded_point(&point).expect(&format!("read public key: {} wrong", &path))
 }
-
+// if just want to get a msg_with_signaturel, use message::sign_and_add_signature
 pub fn sign_msg(private_key: &SigningKey, content: &[u8]) -> Vec<u8> {
     let sig_ret = Signer::sign(private_key, content);
     return Vec::<u8>::from(sig_ret.as_ref())

@@ -1,21 +1,24 @@
+//!This module contains function which process different msg and make consensus.
+
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use serde_json::Value;
-use crate::{message::*, server, constants, config};
+use crate::{message, server, constants, config, network};
 use tokio::time::{sleep, Duration};
 
-pub async fn do_client_request(msg: &ClientMsg, server_mutex: Arc<Mutex<server::Server>>) {
+pub async fn do_client_request(client_msg: message::ClientMsg, server_mutex: &Arc<Mutex<server::Server>>, client_sig: Vec<u8>) {
     print!("successfully enter client request");
     let who_leader = usize::max_value();
     {
         let mut server = server_mutex.lock().unwrap(); 
-        server.client_request[msg.who_send] = (msg.time_stamp.clone(), constants::PRE_PREPARED);
+
+        server.client_request[client_msg.who_send] = (client_msg.time_stamp.clone(), constants::PRE_PREPARED);
     }
     // do leader operation
     if constants::get_i_am() == who_leader {
         // enter pre prepare
-        send_pre_prepare(msg, server_mutex)
+        leader_do_client_request(client_msg, server_mutex, client_sig).await
     }else {
     // do backup operation: make a timer
     // after timeout, check the request status, if it is APPLIED or timestamp is already upated, do normal, else make view change
@@ -23,7 +26,7 @@ pub async fn do_client_request(msg: &ClientMsg, server_mutex: Arc<Mutex<server::
         let mut failed = false;
         {
             let mut server = server_mutex.lock().unwrap(); 
-            if server.client_request[msg.who_send].0 == msg.time_stamp && server.client_request[msg.who_send as usize].1 == constants::PRE_PREPARED{
+            if server.client_request[client_msg.who_send].0 == client_msg.time_stamp && server.client_request[client_msg.who_send as usize].1 == constants::PRE_PREPARED{
                  failed = true;
             }
         }
@@ -33,12 +36,14 @@ pub async fn do_client_request(msg: &ClientMsg, server_mutex: Arc<Mutex<server::
     }
 }
 
-// only for leader send pre_prepare msg
-pub fn send_pre_prepare(msg: &ClientMsg, server_mutex: Arc<Mutex<server::Server>>) {
+// only for leader process client_request (1) generate pre-prepare msg and store it into log (2) broadcast pp_msg to all servers
+pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mutex: &Arc<Mutex<server::Server>>, client_sig: Vec<u8>) {
     let mut new_log: server::Log_entry = Default::default();
+    let mut v = -1;
+    let mut n = -1;
+    // 1. generate pre-prepare msg and store it into log 
     {
         let mut server = server_mutex.lock().unwrap(); 
-
         // 1. check wether there are enough slot, related resend todo 
         if server.log_assign >= config::L as i32 {
             todo!()
@@ -48,7 +53,7 @@ pub fn send_pre_prepare(msg: &ClientMsg, server_mutex: Arc<Mutex<server::Server>
             log_type: constants::CLIENT_REQUEST,
             v: server.my_view,
             n: server.h + server.log_assign,
-            client: msg.who_send,
+            client: client_msg.who_send,
             who_send: constants::get_i_am(),
             cert_prepare_num: 1,
             cert_prepare_vote: vec![false;  config::SERVER_NUM],
@@ -59,10 +64,19 @@ pub fn send_pre_prepare(msg: &ClientMsg, server_mutex: Arc<Mutex<server::Server>
         new_log.cert_prepare_vote[constants::get_i_am()] = true; 
         server.log[log_assign] = new_log;
         server.log_assign += 1;
+        v = server.my_view;
+        n = server.h + server.log_assign;
     }
-    // let pre_prepare_msg = message::Pre_prepare_msg
 
-
+    // 2. construct
+    let mut pp_msg = message::PrePrepareMsg {
+        client_msg: client_msg,
+        client_msg_sig: client_sig,
+        who_send: constants::get_i_am(),
+        v: v,
+        n: n,
+    };
+    network::broadcast_servers(message::Msg::PrePrepareMsg(pp_msg) ).await;
 }
 
 // only for backup who receive pre_prepare msg

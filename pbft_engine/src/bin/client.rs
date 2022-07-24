@@ -22,7 +22,7 @@ use std::time::UNIX_EPOCH;
 #[tokio::main]
 pub async fn main() {
     
-    // Bind a server socket
+    // connect a server socket
     let socket = TcpStream::connect("127.0.0.1:2022").await.unwrap();
 
     // Delimit frames using a length header

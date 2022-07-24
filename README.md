@@ -27,7 +27,7 @@ Specify ip as same in config servers' ip
 
 Before run the engine, generating public key and server keys is required
 
-Run ``cargo run --bin generate_kp` to generate key pairs.
+Run `cargo run --bin generate_kp` to generate key pairs.
 
 Then open server
 

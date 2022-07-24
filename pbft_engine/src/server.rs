@@ -30,6 +30,7 @@ impl Default for Log_entry {
 pub struct Server {
     // normal variables
 	// pub I_am: i32,                                     // Identification of server
+    pub status: i32,                                    // normal, view-change, if view-change, only receive vc related msg                                     
 	pub client_request:  Vec<(String, i32)>,            // (timestemp, status) used to maintain one semantic
     pub my_view: i32,
     pub applied: i32,
@@ -49,6 +50,7 @@ pub struct Server {
 impl Default for Server {
     fn default() -> Self {
         Self {
+            status: 0,
             client_request: vec![("0".to_string(), 0); config::CLIENT_NUM] ,
             my_view: 0,
             applied: -1,
