@@ -16,6 +16,7 @@ pub const COMMIT: i32 = 4;
 pub const VIEW_CHANGE: i32 = 5; 
 
 // log status
+pub const CLIENT_SEND: i32 = 0; // only used in server.client_request.1
 pub const PRE_PREPARED: i32= 1; 
 pub const PREPARED: i32 = 2; 
 pub const COMMITED: i32 = 3;

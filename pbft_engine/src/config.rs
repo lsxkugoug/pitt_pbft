@@ -18,7 +18,8 @@
 
 
 // server
-    pub const SERVER_NUM: usize = 4;
+    pub const F_NUM :i32 = 1;
+    pub const SERVER_NUM: usize = (F_NUM * 3 + 1) as usize; // DONT CHANGE IT
     // servers' public keys file name 
     pub const SERVER_PK: &'static [&'static str] = &[
         "server1_pub",

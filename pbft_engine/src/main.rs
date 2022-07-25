@@ -1,4 +1,4 @@
-use pbft_engine::{consensus::*, server, config, cmd, message, constants};
+use pbft_engine::{consensus::three_normal, consensus::check_msg, consensus::model, config, cmd, network::message, constants};
 use clap::Parser;
 use std::sync::{Arc,Mutex};
 use tokio::net::{TcpListener, TcpStream};
@@ -51,7 +51,7 @@ async fn main(){
         constants::init_constants(i_am);
     }
 
-    let server: server::Server = Default::default();
+    let server: model::Server = Default::default();
     // make view change todo
 
     let server_mutex = Arc::new(Mutex::new(server));
@@ -60,13 +60,13 @@ async fn main(){
         let (mut socket, _) = listener.accept().await.unwrap();
         let server_mutex = Arc::clone(&server_mutex);
         tokio::spawn(async move {
-            preprocess(socket,&server_mutex).await;
+            preprocess_route(socket,&server_mutex).await;
         });
     }
 }
 
 //parse requests
-async fn preprocess(mut socket: TcpStream, server_mutex: &Arc<Mutex<server::Server>>) {
+async fn preprocess_route(mut socket: TcpStream, server_mutex: &Arc<Mutex<model::Server>>) {
         // 1. parse incoming request
         let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
         let mut deserialized = tokio_serde::SymmetricallyFramed::new(
@@ -74,7 +74,6 @@ async fn preprocess(mut socket: TcpStream, server_mutex: &Arc<Mutex<server::Serv
             SymmetricalJson::<Value>::default(),
         );
 
-        // get msg type abnd do some check
         let msg = match deserialized.try_next().await {
             Ok(msg) => {
                 match msg {
@@ -98,15 +97,18 @@ async fn preprocess(mut socket: TcpStream, server_mutex: &Arc<Mutex<server::Serv
                 return;
             },
         };
-        if !message::check_msg(&msg, server_mutex) {
+
+        // 2. check msg
+        if !check_msg::check_msg(&msg, server_mutex) {
             log::info!("receive bad msg, omit it");
             return;            
         } 
         log::info!("sig check successful");
-        // 2. process the job, and check data
+
+        // 3. process the job
         match msg.msg_without_sig {
             message::Msg::ClientMsg(msg_without_sig) => {
-                do_client_request(msg_without_sig, server_mutex, msg.signature).await;
+                three_normal::do_client_request(msg_without_sig, server_mutex, msg.signature).await;
             },
             message::Msg::PrePrepareMsg(msg_without_sig)=> todo!(),
             message::Msg::PrepareMsg(msg_without_sig)=> todo!(),
