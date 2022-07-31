@@ -103,7 +103,6 @@ async fn preprocess_route(mut socket: TcpStream, server_mutex: &Arc<Mutex<model:
             log::info!("receive bad msg, omit it");
             return;            
         } 
-        log::info!("sig check successful");
 
         // 3. process the job
         match msg.msg_without_sig {

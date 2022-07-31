@@ -1,4 +1,4 @@
-//! This file constains functions which check msg before process it. 
+//! This file constains functions which check msg before process it. It never change the server struct, just do check!
 //! When servers receive any msg, it should check them. If msg pass the corresponding checking, go to process functions.
 
 use std::sync::{Arc,Mutex};
@@ -13,7 +13,7 @@ pub fn check_msg(msg_with_sig: &message::MsgWithSignature, server_mutex: &Arc<Mu
         },
         message::Msg::PrePrepareMsg(msg_without_sig) => check_pre_prepare(msg_without_sig, signature, server_mutex),
         message::Msg::PrepareMsg(msg_without_sig) => check_prepare(msg_without_sig, signature, server_mutex),
-        message::Msg::CimmitMsg(msg_without_sig) => check_commit(msg_without_sig, signature, server_mutex),
+        message::Msg::CommitMsg(msg_without_sig) => check_commit(msg_without_sig, signature, server_mutex),
         message::Msg::VcMsg(msg_without_sig) => todo!()
     }
 }
@@ -80,11 +80,14 @@ pub fn check_prepare(msg_without_sig: &message::PrepareMsg, signature: &[u8], se
     result = result && server.my_view == msg_without_sig.v;
     // 4. check n
     result = result && msg_without_sig.n < server.h + config::L as i32 && msg_without_sig.n >= server.h;
-    // 5. check checksum
-    let server_h = server.h;
-    result = result && msg_without_sig.client_msg_checksum == server.log[(msg_without_sig.n - server.h) as usize].client_msg_checksum;
-    // 5. check whether the sender has already vote for this n
-    result = result && !server.log[(msg_without_sig.n - server.h) as usize].cert_prepare_vote[msg_without_sig.who_send];
+    // 5. check checksum if I have already receive pre-prepare msg, if I didnt receive it, just store the msg into
+    // log_entry.advanced_prepare
+    let log_assigned = &server.log[(msg_without_sig.n - server.h) as usize];
+    if !log_assigned.client_msg.is_none() {
+        result = result && msg_without_sig.client_msg_checksum == log_assigned.client_msg_checksum;
+    }
+    // 6. check whether the sender has already vote for this n
+    result = result && !log_assigned.cert_prepare_vote[msg_without_sig.who_send];
     return result
 }
 
@@ -103,10 +106,16 @@ pub fn check_commit(msg_without_sig: &message::CommitMsg, signature: &[u8], serv
     result = result && server.my_view == msg_without_sig.v;
     // 4. check n
     result = result && msg_without_sig.n < server.h + config::L as i32 && msg_without_sig.n >= server.h;
-    // 5. check checksum
-    let server_h = server.h;
-    result = result && msg_without_sig.client_msg_checksum == server.log[(msg_without_sig.n - server.h) as usize].client_msg_checksum;
-    // 5. check whether the sender has already vote for this n
-    result = result && !server.log[(msg_without_sig.n - server.h) as usize].cert_commit_vote[msg_without_sig.who_send];
+
+
+    // 5. check checksum if I have already receive pre-prepare msg, if I didnt receive it, just store the msg into
+    // log_entry.advanced_prepare
+    let log_assigned = &server.log[(msg_without_sig.n - server.h) as usize];
+    if !log_assigned.client_msg.is_none() {
+        result = result && msg_without_sig.client_msg_checksum == log_assigned.client_msg_checksum;
+    }
+
+    // 6. check whether the sender has already vote for this n
+    result = result && !log_assigned.cert_commit_vote[msg_without_sig.who_send];
     return result
 }

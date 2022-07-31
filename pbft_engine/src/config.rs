@@ -1,12 +1,6 @@
-// clients
-    pub const CLIENT_NUM: usize = 3;
 
-    // clients' public keys file name
-    pub const CLIENT_PK: &'static [&'static str] = &[        
-        "clien1_pub",
-        "clien2_pub",
-        "clien3_pub",
-        ];
+// clients
+    pub const CLIENT_NUM: usize = CLIENT_IP.len();
 
     // clients' ips
     pub const CLIENT_IP: &'static [&'static str] = &[
@@ -20,23 +14,16 @@
 // server
     pub const F_NUM :i32 = 1;
     pub const SERVER_NUM: usize = (F_NUM * 3 + 1) as usize; // DONT CHANGE IT
-    // servers' public keys file name 
-    pub const SERVER_PK: &'static [&'static str] = &[
-        "server1_pub",
-        "server2_pub",    
-        "server3_pub",    
-    ];
-    // clients' ips
     pub const SERVER_IP: &'static [&'static str] = &[
         "127.0.0.1:2020",
         "127.0.0.1:2021",
         "127.0.0.1:2022",
         "127.0.0.1:2023",
     ];
-    
-
 
 // log and checkpoint management
     pub const L:usize = 60;
     pub const K:usize = 20;
+
+
 

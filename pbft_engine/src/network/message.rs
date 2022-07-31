@@ -69,7 +69,7 @@ pub enum Msg {
     ClientMsg(ClientMsg),
     PrePrepareMsg(PrePrepareMsg),
     PrepareMsg(PrepareMsg),
-    CimmitMsg(CommitMsg),
+    CommitMsg(CommitMsg),
     VcMsg(VcMsg),
 }
 
@@ -85,7 +85,7 @@ pub fn sign_and_add_signature(msg_witout_signature: Msg) -> MsgWithSignature {
         Msg::ClientMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
         Msg::PrePrepareMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
         Msg::PrepareMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
-        Msg::CimmitMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
+        Msg::CommitMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
         Msg::VcMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap()
     };
     let signature = cryptography::sign_msg(&constants::get_my_prikey().unwrap(), &msg_bytes);

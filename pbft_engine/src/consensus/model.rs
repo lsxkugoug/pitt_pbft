@@ -18,11 +18,28 @@ pub struct Log_entry {
 
     pub cert_commit_num: i32,
 	pub cert_commit_vote: Vec<bool>,
+
+    // This two variable is try to solve the problem receive prepare or commit msg before receive pre-prepare msg from leader
+    pub advanced_prepare:Vec<Vec<u8>>,
+    pub advanced_commit:Vec<Vec<u8>>,
+
 }
 
 impl Default for Log_entry {
     fn default() -> Self {
-        Self {client_msg: None, client_msg_checksum: Default::default(),  log_type: Default::default(), v: Default::default(), n: -1, client: Default::default(), who_send: Default::default(), cert_prepare_num: Default::default(), cert_prepare_vote: vec![false; config::SERVER_NUM], cert_commit_num: Default::default(), cert_commit_vote: vec![false; config::SERVER_NUM]}
+        Self {client_msg: None, 
+            client_msg_checksum: Default::default(),  
+            log_type: Default::default(), 
+            v: Default::default(), 
+            n: -1, client: Default::default(), 
+            who_send: Default::default(), 
+            cert_prepare_num: Default::default(), 
+            cert_prepare_vote: vec![false; config::SERVER_NUM], 
+            cert_commit_num: Default::default(), 
+            cert_commit_vote: vec![false; config::SERVER_NUM],
+            advanced_prepare: vec![vec![]; config::SERVER_NUM],
+            advanced_commit: vec![vec![]; config::SERVER_NUM],
+        }
     }
 }
 

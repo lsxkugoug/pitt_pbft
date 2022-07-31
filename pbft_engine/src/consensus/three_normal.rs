@@ -12,10 +12,11 @@ use tokio::time::{sleep, Duration};
 
 pub async fn do_client_request(client_msg: message::ClientMsg, server_mutex: &Arc<Mutex<model::Server>>, client_sig: Vec<u8>) {
     print!("successfully enter client request");
-    let who_leader = usize::max_value();
+    let mut who_leader = usize::max_value();
     {
         let mut server = server_mutex.lock().unwrap(); 
         server.client_request[client_msg.who_send] = (client_msg.time_stamp.clone(), constants::CLIENT_SEND);
+        who_leader = server.who_leader as usize;
     }
     // do leader operation
     if constants::get_i_am() == who_leader {
@@ -40,7 +41,7 @@ pub async fn do_client_request(client_msg: message::ClientMsg, server_mutex: &Ar
 
 // only for leader process client_request (1) generate pre-prepare msg and store it into log (2) broadcast pp_msg to all servers
 pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mutex: &Arc<Mutex<model::Server>>, client_sig: Vec<u8>) {
-    let mut new_log: model::Log_entry = Default::default();
+    let new_log: model::Log_entry = Default::default();
     let mut v = -1;
     let mut n = -1;
     // 1. generate pre-prepare msg and store it into log 
@@ -63,6 +64,8 @@ pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mut
             cert_prepare_vote: vec![false;  config::SERVER_NUM],
             cert_commit_num: 0,
             cert_commit_vote: vec![false;  config::SERVER_NUM],
+            advanced_prepare: vec![vec![]; config::SERVER_NUM],
+            advanced_commit: vec![vec![]; config::SERVER_NUM],
         };
         // 3. change 
         let log_assign = server.log_assign as usize;
@@ -83,6 +86,7 @@ pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mut
         n: n,
     };
     message::broadcast_servers(message::Msg::PrePrepareMsg(pp_msg)).await;
+
 }
 
 // only backups receive pre-prepare msg, leader doesn't
@@ -96,27 +100,58 @@ pub async fn do_pre_prepare(pre_prepare_msg: message::PrePrepareMsg, server_mute
     {
         let mut server = server_mutex.lock().unwrap();
         let server_h = server.h;
+        let who_leader = server.who_leader;
         has_prev = !server.log[(pre_prepare_msg.n - server.h) as usize].client_msg.is_none();
         if !has_prev { // add it
-            let mut new_log = model::Log_entry {
-                client_msg: Some(pre_prepare_msg.client_msg.clone()),
-                client_msg_checksum: message::get_client_msg_sha256(&pre_prepare_msg.client_msg),
-                log_type: constants::PRE_PREPARED,
-                v: pre_prepare_msg.v,   // it should be rec_msg.v and n, since server.status == vc when execute this function
-                n: pre_prepare_msg.n,
-                client: pre_prepare_msg.client_msg.who_send,
-                who_send: pre_prepare_msg.who_send,
-                cert_prepare_num: 2,
-                cert_prepare_vote: vec![false; config::SERVER_NUM],
-                cert_commit_num: 0,
-                cert_commit_vote: vec![false; config::SERVER_NUM],
+            let log_assigned = &mut server.log[(pre_prepare_msg.n - server_h) as usize];
+            log_assigned.client_msg = Some(pre_prepare_msg.client_msg.clone());
+            let msg_check_sum = message::get_client_msg_sha256(&pre_prepare_msg.client_msg);
+            log_assigned.client_msg_checksum = msg_check_sum;
+            log_assigned.log_type = constants::PRE_PREPARED;
+            // for log type, since the node may receive prepare or commit msg before it receive pre-prepare msg
+            // so we should check advanced_prepare and advanced_commit array before assign it
+            let mut log_type = constants::PRE_PREPARED;
+            let mut count_prepare = 0;
+            for (server_id, prepare_check_sum) in log_assigned.advanced_prepare.iter().enumerate() {
+                if *prepare_check_sum == log_assigned.client_msg_checksum {
+                    log_assigned.cert_prepare_vote[server_id] = true;
+                    count_prepare += 1;
+                }
+            }
+            if count_prepare >= 2 * config::F_NUM - 1 {
+                log_type = max(constants::PREPARED, log_type);
+            }
+            let mut count_commit = 0;
+            for (server_id, commit_check_sum) in log_assigned.advanced_commit.iter().enumerate() {
+                if *commit_check_sum == log_assigned.client_msg_checksum {
+                    log_assigned.cert_prepare_vote[server_id] = true;
+                    count_commit += 1;
+                }
+            }
+            if count_commit >= 2 * config::F_NUM - 1 {
+                log_type = max(constants::COMMIT, log_type);
+            }
+            log_assigned.v = pre_prepare_msg.v;
+            log_assigned.n = pre_prepare_msg.n;
+            log_assigned.client = pre_prepare_msg.client_msg.who_send;
+            log_assigned.who_send = pre_prepare_msg.who_send;
+            log_assigned.cert_prepare_num = 2 + count_prepare;
+            log_assigned.cert_prepare_vote[who_leader as usize] = true;
+            log_assigned.cert_prepare_vote[constants::get_i_am()] = true;
+
+            // if msg is already prepare msg, should broadcast prepare msg
+            if log_assigned.log_type == constants::PRE_PREPARED {
+                let commit_msg = message::CommitMsg {
+                    msg_type: constants::COMMIT,
+                    client_msg_checksum: log_assigned.client_msg_checksum.clone(),
+                    who_send: constants::get_i_am(),
+                    v: log_assigned.v,
+                    n: log_assigned.n,
                 };
-            new_log.cert_commit_vote[server.who_leader as usize] = true;
-            new_log.cert_commit_vote[constants::get_i_am()] = true;
-            server.log[(pre_prepare_msg.n - server_h) as usize] = new_log;
+                message::broadcast_servers(message::Msg::CommitMsg(commit_msg)).await;
+            }
         }
     }
-    
     // create prepare msg
     let prepare_msg = message::PrepareMsg {
         msg_type: constants::PREPARE,
@@ -134,17 +169,23 @@ pub async fn do_prepare(prepare_msg: message::PrepareMsg, server_mutex: &Arc<Mut
     // 1. change log and client_request
     {
         let mut server = server_mutex.lock().unwrap();
-        let server_h = (prepare_msg.n - server.h) as usize;
-        
-        server.log[server_h].cert_prepare_num += 1;
-        server.log[server_h].cert_prepare_vote[prepare_msg.who_send] = true;
-        if server.log[server_h].cert_prepare_num > 2 * config::F_NUM {
-            server.log[server_h].log_type = max(server.log[server_h].log_type, constants::PREPARED);
-            let client = server.log[server_h].client_msg.as_ref().unwrap().who_send;
+        let server_h = server.h;
+        let log_assign = &mut server.log[(prepare_msg.n - server_h) as usize];
+        // if we dont receive corresponding pre-prepare msg, we just store the check sum into lot_entry.advance_prepare
+        // and dont do the next step process until received pre-prepare msg from leader
+        if log_assign.client_msg.is_none() {
+            log_assign.advanced_prepare[(prepare_msg.n - server_h) as usize] = prepare_msg.client_msg_checksum;
+            return;
+        }
+        log_assign.cert_prepare_num += 1;
+        log_assign.cert_prepare_vote[prepare_msg.who_send] = true;
+        if log_assign.cert_prepare_num > 2 * config::F_NUM {
+            log_assign.log_type = max(log_assign.log_type, constants::PREPARED);
+            let client = log_assign.client_msg.as_ref().unwrap().who_send;
             server.client_request[client].1 = max(server.client_request[client].1, constants::PREPARED);
             commit_msg = Some(message::CommitMsg {
                 msg_type: constants::COMMIT,
-                client_msg_checksum: server.log[server_h].client_msg_checksum.clone(),
+                client_msg_checksum: prepare_msg.client_msg_checksum,
                 who_send: constants::get_i_am(),
                 v: prepare_msg.v,
                 n: prepare_msg.n,
@@ -153,9 +194,8 @@ pub async fn do_prepare(prepare_msg: message::PrepareMsg, server_mutex: &Arc<Mut
     }
     // 2. if meet 2f + 1, start commit phase
     if !commit_msg.is_none() {
-        message::broadcast_servers(message::Msg::CimmitMsg(commit_msg.unwrap())).await;
+        message::broadcast_servers(message::Msg::CommitMsg(commit_msg.unwrap())).await;
     }
-
 }
 
 pub async fn do_commit(commit_msg: message::CommitMsg, server_mutex: &Arc<Mutex<model::Server>>) {

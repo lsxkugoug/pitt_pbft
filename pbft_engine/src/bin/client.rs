@@ -1,9 +1,10 @@
-// a simple client 0 simulator, just used to test engine code.
+//! a simple client 0 simulator, just used to test engine code. Send msg to all of replicas
 
 use std::fs::OpenOptions;
 
+use clap::Parser;
 use futures::prelude::*;
-use pbft_engine::cryptography;
+use pbft_engine::{cryptography, config, cmd, network::message};
 use pbft_engine::cryptography::load_private_key;
 use serde_json::json;
 use tokio::net::TcpStream;
@@ -11,43 +12,52 @@ use tokio_serde::formats::*;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
 use pbft_engine::constants;
-use pbft_engine::message;
 
-use ring::{rand, signature};
 use std::time::{Duration, SystemTime};
-use p256::ecdsa::{SigningKey, VerifyingKey};
 use std::time::UNIX_EPOCH;
 
-// note: for sign msg, only sign message::ClientMsg, but not any enum which can wrap message::ClientMsg.
+
+// set the number of operations you want to send to pbft engine
+const REQUEST_NUM: i32 = 100; 
+
 #[tokio::main]
 pub async fn main() {
-    
-    // connect a server socket
-    let socket = TcpStream::connect("127.0.0.1:2022").await.unwrap();
-
-    // Delimit frames using a length header
-    let length_delimited = FramedWrite::new(socket, LengthDelimitedCodec::new());
-
-    // Serialize frames with JSON
-    let mut serialized =
-        tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
-    let client_request = message::ClientMsg{
-        msg_type: constants::CLIENT_REQUEST,
-        who_send: 0,
-        operation: "this is operation".to_string(),
-        time_stamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string(),
+    let args = cmd::Args::parse();
+    let mut i_am: usize = usize::max_value();
+    let my_ip = args.ip;
+    // get my identification
+    for (idx, ip) in config::CLIENT_IP.iter().enumerate() {
+        if my_ip == *ip {
+            i_am = idx;
+        }
     };
-    // sign it
-    let sign_key = load_private_key("./key_pairs/client/0/pri_key".to_string());
-    let signature = cryptography::sign_msg(&sign_key, &bincode::serialize(&client_request).unwrap());
-    // wrap msg as enum
-    let client_request_enum = message::Msg::ClientMsg(client_request);
-    let send_obj = message::MsgWithSignature{msg_without_sig: client_request_enum, signature: signature};
-    let json_obj = json!(&send_obj);
-    // Send the value
-    serialized
-        .send(json_obj)
-        .await
-        .unwrap()
+    unsafe{
+        constants::init_constants(i_am);
+    }
+    // get my private key
+    let sign_key = load_private_key(format!("./key_pairs/client/{}/pri_key", i_am));
+
+
+    // open another thread to receive servers' msg
+
+
+    for i in 0..REQUEST_NUM {
+        for server in 0..config::SERVER_NUM {
+            let client_request = message::ClientMsg{
+                msg_type: constants::CLIENT_REQUEST,
+                who_send: 0,
+                operation: format!("this is msg {} from client {}", i, i_am).to_string(),
+                time_stamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().to_string(),
+            };
+            // sign it
+            let signature = cryptography::sign_msg(&sign_key, &bincode::serialize(&client_request).unwrap());
+            // wrap msg as enum
+            let client_request_enum = message::Msg::ClientMsg(client_request);
+            let send_obj = message::MsgWithSignature{msg_without_sig: client_request_enum, signature: signature};
+            // Send the valuen  
+            message::send_server(server, send_obj).await;        
+        };
+    };
+
         
 }

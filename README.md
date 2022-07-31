@@ -35,3 +35,33 @@ Then open server
 
 
 
+
+
+TODO LIST:
+
+repair the problem when a node receive pm cm before receiving pp from leader: √
+
+checkpoint management feature
+
+Message Retransmission feature
+
+VIEW-CHANGE logic
+
+Test three normal phase
+
+Test view change
+
+
+
+
+
+
+
+
+
+
+
+Research part: proactive recovery
+
+
+

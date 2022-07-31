@@ -30,11 +30,6 @@ pub static mut CLIENT_PUB: Vec<VerifyingKey> = Vec::new();
 pub static mut SERVER_PUB: Vec<VerifyingKey> = Vec::new();
 pub static mut MY_PRIVATE_KEY: Option<SigningKey> = None;
 
-
-
-
-
-
 // this function is used to init server constants. Scalable to future change.
 pub unsafe fn init_constants(i_am: usize) {
     // 1. init server variable
