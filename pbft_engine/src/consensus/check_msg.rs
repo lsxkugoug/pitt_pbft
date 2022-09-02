@@ -1,9 +1,9 @@
 //! This file constains functions which check msg before process it. It never change the server struct, just do check!
 //! When servers receive any msg, it should check them. If msg pass the corresponding checking, go to process functions.
 
-use std::sync::{Arc,Mutex};
+use std::{sync::{Arc,Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
-use crate::{network::message, consensus::model, constants, config, cryptography};
+use crate::{network::message, consensus::model, constants, config, cryptography, network::msg_rt};
 
 pub fn check_msg(msg_with_sig: &message::MsgWithSignature, server_mutex: &Arc<Mutex<model::Server>>) ->bool {
     let signature = &msg_with_sig.signature;
@@ -14,7 +14,10 @@ pub fn check_msg(msg_with_sig: &message::MsgWithSignature, server_mutex: &Arc<Mu
         message::Msg::PrePrepareMsg(msg_without_sig) => check_pre_prepare(msg_without_sig, signature, server_mutex),
         message::Msg::PrepareMsg(msg_without_sig) => check_prepare(msg_without_sig, signature, server_mutex),
         message::Msg::CommitMsg(msg_without_sig) => check_commit(msg_without_sig, signature, server_mutex),
-        message::Msg::VcMsg(msg_without_sig) => todo!()
+        message::Msg::VcMsg(msg_without_sig) => todo!(),
+        message::Msg::RtMsg(msg_without_sig) => check_rt(msg_without_sig, signature, server_mutex),
+        message::Msg::ClientReplyMsg(_) => false,
+        message::Msg::CheckPointMsg(msg_without_sig) => todo!(),
     }
 }
 
@@ -40,7 +43,7 @@ pub fn check_client_request(msg_without_sig: &message::ClientMsg, signature: &[u
 pub fn check_pre_prepare(msg_without_sig: &message::PrePrepareMsg, signature: &[u8], server_mutex: &Arc<Mutex<model::Server>>) -> bool {
     let mut result = true;
     // 1. check wether in view change status
-    let server = server_mutex.lock().unwrap();
+    let mut server = server_mutex.lock().unwrap();
     if server.status == constants::DO_VIEW_CHANGE {
         log::info!("receive client msg, but not is in view-change status");
         return false
@@ -58,9 +61,9 @@ pub fn check_pre_prepare(msg_without_sig: &message::PrePrepareMsg, signature: &[
     // 4. check n
     result = result && msg_without_sig.n < server.h + config::L as i32 && msg_without_sig.n >= server.h;
     // 5. if the log's slot is null or this pre-prepare msg is as same as precvious one
-    let log_pointer = msg_without_sig.n - server.h;
-    result = result && (server.log[log_pointer as usize].client_msg.is_none() || 
-                        server.log[log_pointer as usize].client_msg_checksum == message::get_client_msg_sha256(&msg_without_sig.client_msg));
+    let log_pointer = (msg_without_sig.n - server.h) as usize;
+    result = result && (server.log.get(log_pointer).client_msg.is_none() || 
+                        server.log.get(log_pointer).client_msg_checksum == message::get_client_msg_sha256(&msg_without_sig.client_msg));
     result
 }
 
@@ -68,7 +71,8 @@ pub fn check_pre_prepare(msg_without_sig: &message::PrePrepareMsg, signature: &[
 pub fn check_prepare(msg_without_sig: &message::PrepareMsg, signature: &[u8], server_mutex: &Arc<Mutex<model::Server>>) -> bool {
     let mut result = true;
     // 1. check wether in view change status
-    let server = server_mutex.lock().unwrap();
+    let mut server = server_mutex.lock().unwrap();
+    let server_h = server.h;
     if server.status == constants::DO_VIEW_CHANGE {
         log::info!("receive client msg, but not is in view-change status");
         return false
@@ -82,7 +86,7 @@ pub fn check_prepare(msg_without_sig: &message::PrepareMsg, signature: &[u8], se
     result = result && msg_without_sig.n < server.h + config::L as i32 && msg_without_sig.n >= server.h;
     // 5. check checksum if I have already receive pre-prepare msg, if I didnt receive it, just store the msg into
     // log_entry.advanced_prepare
-    let log_assigned = &server.log[(msg_without_sig.n - server.h) as usize];
+    let log_assigned = &server.log.get((msg_without_sig.n - server_h) as usize);
     if !log_assigned.client_msg.is_none() {
         result = result && msg_without_sig.client_msg_checksum == log_assigned.client_msg_checksum;
     }
@@ -94,7 +98,8 @@ pub fn check_prepare(msg_without_sig: &message::PrepareMsg, signature: &[u8], se
 pub fn check_commit(msg_without_sig: &message::CommitMsg, signature: &[u8], server_mutex: &Arc<Mutex<model::Server>>) -> bool {
     let mut result = true;
     // 1. check wether in view change status
-    let server = server_mutex.lock().unwrap();
+    let mut server = server_mutex.lock().unwrap();
+    let server_h = server.h;
     if server.status == constants::DO_VIEW_CHANGE {
         log::info!("receive client msg, but not is in view-change status");
         return false
@@ -109,8 +114,8 @@ pub fn check_commit(msg_without_sig: &message::CommitMsg, signature: &[u8], serv
 
 
     // 5. check checksum if I have already receive pre-prepare msg, if I didnt receive it, just store the msg into
-    // log_entry.advanced_prepare
-    let log_assigned = &server.log[(msg_without_sig.n - server.h) as usize];
+    // log_entry.advanced_commit
+    let log_assigned = &server.log.get((msg_without_sig.n - server_h) as usize);
     if !log_assigned.client_msg.is_none() {
         result = result && msg_without_sig.client_msg_checksum == log_assigned.client_msg_checksum;
     }
@@ -119,3 +124,35 @@ pub fn check_commit(msg_without_sig: &message::CommitMsg, signature: &[u8], serv
     result = result && !log_assigned.cert_commit_vote[msg_without_sig.who_send];
     return result
 }
+
+// check check point msg
+pub fn check_check_point(msg_without_sig: &message::CheckPointMsg, signature: &[u8]) -> bool {
+    let mut result = true;
+    // 1. check signature
+    result = result && cryptography::verify_sig(&constants::get_server_pub(msg_without_sig.who_send).unwrap(), 
+                                            &bincode::serialize(&msg_without_sig).unwrap(), signature);
+
+    result
+}
+
+// check msg retransmission gc
+// if server is view changing, only do gc
+pub fn check_rt(msg_without_sig: &message::RtMsg, signature: &[u8], server_mutex: &Arc<Mutex<model::Server>>) -> bool {
+    let mut result = true;
+    // 1. check signature
+    result = result && cryptography::verify_sig(&constants::get_server_pub(msg_without_sig.who_send).unwrap(), 
+                                            &bincode::serialize(&msg_without_sig).unwrap(), signature);
+
+    // check last retransmission msg, if it is not meet interval, ommit it
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    {
+        let server = server_mutex.lock().unwrap();
+        let last_time = server.last_rcv[msg_without_sig.who_send];
+        if now - last_time < config::RT_INTERV as u128 {
+            result = false;
+        }
+    }
+    
+    result
+}
+

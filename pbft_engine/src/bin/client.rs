@@ -39,8 +39,6 @@ pub async fn main() {
 
 
     // open another thread to receive servers' msg
-
-
     for i in 0..REQUEST_NUM {
         for server in 0..config::SERVER_NUM {
             let client_request = message::ClientMsg{
@@ -58,6 +56,4 @@ pub async fn main() {
             message::send_server(server, send_obj).await;        
         };
     };
-
-        
 }

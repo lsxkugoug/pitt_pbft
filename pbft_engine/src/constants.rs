@@ -15,15 +15,14 @@ pub const PREPARE: i32 = 3;
 pub const COMMIT: i32 = 4; 
 pub const VIEW_CHANGE: i32 = 5; 
 
-// log status
-pub const CLIENT_SEND: i32 = 0; // only used in server.client_request.1
+// log_entry status
+pub const LOG_ENTRY_INIT: i32 = 0; // means the slot is not used or not receive pp msg.
 pub const PRE_PREPARED: i32= 1; 
 pub const PREPARED: i32 = 2; 
 pub const COMMITED: i32 = 3;
 pub const APPLIED: i32 = 4;
 
-// consensus
-pub const TIMEOUT: u64 = 300;   // when timeout, go to view change
+
 
 // public key, it initialized after program, little tricky
 pub static mut CLIENT_PUB: Vec<VerifyingKey> = Vec::new();

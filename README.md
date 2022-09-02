@@ -41,11 +41,17 @@ TODO LIST:
 
 repair the problem when a node receive pm cm before receiving pp from leader: √
 
+garbage collection feature
+
 checkpoint management feature
+
+State transfer feature
 
 Message Retransmission feature
 
 VIEW-CHANGE logic
+
+
 
 Test three normal phase
 

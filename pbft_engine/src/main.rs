@@ -1,8 +1,7 @@
-use pbft_engine::{consensus::three_normal, consensus::check_msg, consensus::model, config, cmd, network::message, constants};
+use pbft_engine::{consensus::three_normal, consensus::check_msg, consensus::model, config, cmd, network::{message, self}, constants, network::msg_rt, checkpoint_gc::*};
 use clap::Parser;
 use std::sync::{Arc,Mutex};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use futures::prelude::*;
 use serde_json::Value;
@@ -28,7 +27,7 @@ async fn get_sever_num() -> (usize, String) {
 }
 
 #[tokio::main]
-async fn main(){
+async fn main() {
     // to do split this part to init server and bind port
     // read public key and my private key todo
 
@@ -52,21 +51,32 @@ async fn main(){
     }
 
     let server: model::Server = Default::default();
-    // make view change todo
+    // open a new thread to make msg retransmission
+
 
     let server_mutex = Arc::new(Mutex::new(server));
+    let server_mutex_rt = Arc::clone(&server_mutex);
+
+    tokio::spawn(async move {
+        network::period_rt(server_mutex_rt).await;
+    });
+
+
+    
     loop {
         // The second item contains the IP and port of the new connection.
-        let (mut socket, _) = listener.accept().await.unwrap();
-        let server_mutex = Arc::clone(&server_mutex);
+        let (socket, _) = listener.accept().await.unwrap();
+        let server_mutex_pro = Arc::clone(&server_mutex);
         tokio::spawn(async move {
-            preprocess_route(socket,&server_mutex).await;
+            preprocess_route(socket, server_mutex_pro).await;
+
         });
+        // note: this tokio should not use join or await, since it wrapped by a loop, the tasks of sub thread must complete
     }
 }
 
 //parse requests
-async fn preprocess_route(mut socket: TcpStream, server_mutex: &Arc<Mutex<model::Server>>) {
+async fn preprocess_route(socket: TcpStream, server_mutex: Arc<Mutex<model::Server>>) {
         // 1. parse incoming request
         let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
         let mut deserialized = tokio_serde::SymmetricallyFramed::new(
@@ -99,7 +109,7 @@ async fn preprocess_route(mut socket: TcpStream, server_mutex: &Arc<Mutex<model:
         };
 
         // 2. check msg
-        if !check_msg::check_msg(&msg, server_mutex) {
+        if !check_msg::check_msg(&msg, &server_mutex) {
             log::info!("receive bad msg, omit it");
             return;            
         } 
@@ -109,10 +119,12 @@ async fn preprocess_route(mut socket: TcpStream, server_mutex: &Arc<Mutex<model:
             message::Msg::ClientMsg(msg_without_sig) => {
                 three_normal::do_client_request(msg_without_sig, server_mutex, msg.signature).await;
             },
-            message::Msg::PrePrepareMsg(msg_without_sig)=> todo!(),
-            message::Msg::PrepareMsg(msg_without_sig)=> todo!(),
-            COMMIT => todo!(),
-            VIEW_CHANGE => todo!(),
+            message::Msg::PrePrepareMsg(msg_without_sig)=> three_normal::do_pre_prepare(msg_without_sig, server_mutex).await,
+            message::Msg::PrepareMsg(msg_without_sig)=> three_normal::do_prepare(msg_without_sig, server_mutex).await,
+            message::Msg::CommitMsg(msg_without_sig)=> three_normal::do_commit(msg_without_sig, server_mutex).await,
+            message::Msg::VcMsg(msg_without_sig)=> todo!(),
+            message::Msg::RtMsg(msg_without_sig)=> msg_rt::do_rt(msg_without_sig, server_mutex).await,
+            // message::Msg::CheckPointMsg(msg_without_sig)=> gc::do_check_point(msg_without_sig, server_mutex).await,
             _ => {
                 log::info!("no match type, stop process this message");
             }

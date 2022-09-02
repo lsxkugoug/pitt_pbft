@@ -21,9 +21,19 @@
         "127.0.0.1:2023",
     ];
 
+
+// consensus
+    pub const TIMEOUT: u64 = 300;   // when timeout, go to view change
+
 // log and checkpoint management
     pub const L:usize = 60;
     pub const K:usize = 20;
+
+
+// retransmission
+    pub const RT_INTERV: u128 = 50;  // nodes periodically broadcast their status, receiver nodes periodically accept their status msg RT_INTERV * 2 / 3
+    pub const RT_RCV: u128 = (RT_INTERV * 2) / 3;
+
 
 
 
