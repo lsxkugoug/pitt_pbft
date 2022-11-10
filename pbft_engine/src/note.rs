@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod test{
-    use std::{thread::{sleep_ms, sleep}, fs, vec};
+    use std::{thread::{sleep_ms, sleep}, fs, vec, collections::HashMap};
 
     use futures::prelude::*;
     use serde_json::json;
@@ -30,6 +30,16 @@ mod test{
         for t in tasks {
             t.await.unwrap(); 
         }
+    }
+    
+    #[tokio::main]
+    #[test]
+    async fn test_map() {
+        let mut process_map: HashMap<i32, (i32, i32)> = HashMap::new();
+        process_map.insert(1, (1,2));
+        let x = process_map.entry(1).or_insert((1,1));
+        x.1 = 6;
+        print!("{}", process_map.get(&1).unwrap().1);
     }
 }
 

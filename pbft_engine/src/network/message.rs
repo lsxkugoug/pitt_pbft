@@ -12,7 +12,7 @@
 //! 
 
 use serde::{Deserialize, Serialize};
-use crate::{cryptography, constants, config};
+use crate::{cryptography, constants, config, consensus::{LogEntry, StateEntry}};
 
 use futures::prelude::*;
 use serde_json::json;
@@ -70,33 +70,38 @@ pub struct CommitMsg {
 pub struct VcMsg {
     pub msg_type: i32,
     pub v: i32,
-    pub n: i32,
     pub who_send: usize,
+    pub last_stable_sq: i32,
+    pub stable_certificates: Vec<(RtMsg, Vec<u8>)>, // used to verify latgest stable squence number
+    pub prepared_set: Vec<LogEntry> ,
+
 }
 
-
-
-// 4. checkpoint management msg
 #[derive(Serialize, Deserialize, Clone)]
-pub struct CheckPointMsg {
-    pub msg_type: i32,
-    pub n: i32, // n % k should == 0
-    // pub d: Vec<u8>, //? why need that todo
-    pub who_send: usize,
-
+pub struct  NewViewMsg {
+    pub mst_type: i32,
+    pub v: i32,
+    pub vc_certificate: Vec<(VcMsg, Vec<u8>)>
 }
+
 // 5. retransmition msg
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RtMsg {
-    pub node_status: i32,
-    pub v: i32,
-    pub h: i32,     // last stable checkpoint sequence number
-    pub le: i32,    // le is the last exected sequence number
     pub who_send: usize,
-    pub log_status: Vec<i32>
+    pub low_water: i32,
+    pub node_status: i32, // pending or normal
+    pub last_applied_seq: i32,
+    pub log_entry_status_set: Vec<(i32, i32, Vec<u8>)>,
 }
 
-
+// 6. rt_rpl msg, used to restore state and pp msg
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RtRplMsg{
+    pub who_send: usize,
+    // restore_state is empty or restore_pp is empty. is restore_state == None, process restore_pp, vise versa
+    pub restore_state: Option<(i32 ,Vec<StateEntry>)>,  // only for sender who need st
+    pub restore_pp: Vec<StateEntry>, // only for sender already complete state transfer
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Msg {
@@ -106,8 +111,9 @@ pub enum Msg {
     PrepareMsg(PrepareMsg),
     CommitMsg(CommitMsg),
     VcMsg(VcMsg),
+    NewViewMsg(NewViewMsg),
     RtMsg(RtMsg),
-    CheckPointMsg(CheckPointMsg)
+    RtRplMsg(RtRplMsg)
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -128,8 +134,8 @@ pub fn sign_and_add_signature(msg_witout_signature: Msg) -> MsgWithSignature {
         Msg::CommitMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
         Msg::VcMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
         Msg::RtMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
-        Msg::CheckPointMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
-
+        Msg::NewViewMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
+        Msg::RtRplMsg(msg_witout_signature) => bincode::serialize(msg_witout_signature).unwrap(),
     };
     let signature = cryptography::sign_msg(&constants::get_my_prikey().unwrap(), &msg_bytes);
     MsgWithSignature{msg_without_sig: msg_witout_signature, signature: signature}
@@ -140,7 +146,8 @@ pub fn get_client_msg_sha256(client_msg: & ClientMsg) -> Vec<u8> {
 }
 
 
-pub async fn send_server(server: usize, msg_with_sig: MsgWithSignature) {
+pub async fn send_server(server: usize, msg_without_sig: Msg) {
+    let msg_with_sig = sign_and_add_signature(msg_without_sig);
     let socket = TcpStream::connect(config::SERVER_IP[server]).await.unwrap();
     let length_delimited = FramedWrite::new(socket, LengthDelimitedCodec::new());
     let mut serialized =
@@ -153,13 +160,12 @@ pub async fn send_server(server: usize, msg_with_sig: MsgWithSignature) {
 
 // use server's private key sign the msg, and broadcast to all the servers except the server itself
 pub async fn broadcast_servers(msg_without_sig:  Msg) {
-    let msg_with_sig = sign_and_add_signature(msg_without_sig);
     let mut tasks = Vec::new();
     for server in 0..config::SERVER_IP.len() {
         if server == constants::get_i_am() {
             continue;
         }
-        let send_msg = msg_with_sig.clone();
+        let send_msg = msg_without_sig.clone();
         tasks.push(tokio::spawn(async move {
             send_server(server, send_msg).await;
         }));

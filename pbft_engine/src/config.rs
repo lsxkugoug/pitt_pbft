@@ -34,6 +34,7 @@
     pub const RT_INTERV: u128 = 50;  // nodes periodically broadcast their status, receiver nodes periodically accept their status msg RT_INTERV * 2 / 3
     pub const RT_RCV: u128 = (RT_INTERV * 2) / 3;
 
-
+// view change
+    pub const VC_TIMEOUT: u64 = 40;
 
 

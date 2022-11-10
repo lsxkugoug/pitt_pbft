@@ -14,9 +14,12 @@ pub const PRE_PREPARE: i32 = 2;
 pub const PREPARE: i32 = 3; 
 pub const COMMIT: i32 = 4; 
 pub const VIEW_CHANGE: i32 = 5; 
+pub const NEW_VIEW: i32 = 6;
+
 
 // log_entry status
-pub const LOG_ENTRY_INIT: i32 = 0; // means the slot is not used or not receive pp msg.
+pub const CAN_RECEND:i32 = -1; // if in view change, the msg < prepared, drop it. In this case, accept clients resend msg
+pub const LOG_ENTRY_INIT: i32 = 0; // means the slot is not used or not receive pp msg. but it can receive advanced_p or commit msg!
 pub const PRE_PREPARED: i32= 1; 
 pub const PREPARED: i32 = 2; 
 pub const COMMITED: i32 = 3;

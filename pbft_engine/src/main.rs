@@ -108,23 +108,19 @@ async fn preprocess_route(socket: TcpStream, server_mutex: Arc<Mutex<model::Serv
             },
         };
 
-        // 2. check msg
-        if !check_msg::check_msg(&msg, &server_mutex) {
-            log::info!("receive bad msg, omit it");
-            return;            
-        } 
+
 
         // 3. process the job
         match msg.msg_without_sig {
             message::Msg::ClientMsg(msg_without_sig) => {
-                three_normal::do_client_request(msg_without_sig, server_mutex, msg.signature).await;
+                three_normal::do_client_request(msg_without_sig, server_mutex, &msg.signature, &msg.signature).await;
             },
-            message::Msg::PrePrepareMsg(msg_without_sig)=> three_normal::do_pre_prepare(msg_without_sig, server_mutex).await,
-            message::Msg::PrepareMsg(msg_without_sig)=> three_normal::do_prepare(msg_without_sig, server_mutex).await,
-            message::Msg::CommitMsg(msg_without_sig)=> three_normal::do_commit(msg_without_sig, server_mutex).await,
+            message::Msg::PrePrepareMsg(msg_without_sig)=> three_normal::do_pre_prepare(msg_without_sig, server_mutex,&msg.signature).await,
+            message::Msg::PrepareMsg(msg_without_sig)=> three_normal::do_prepare(msg_without_sig, server_mutex, &msg.signature).await,
+            message::Msg::CommitMsg(msg_without_sig)=> three_normal::do_commit(msg_without_sig, server_mutex, &msg.signature).await,
             message::Msg::VcMsg(msg_without_sig)=> todo!(),
-            message::Msg::RtMsg(msg_without_sig)=> msg_rt::do_rt(msg_without_sig, server_mutex).await,
-            // message::Msg::CheckPointMsg(msg_without_sig)=> gc::do_check_point(msg_without_sig, server_mutex).await,
+            message::Msg::RtMsg(msg_without_sig)=> msg_rt::do_rt(msg_without_sig, server_mutex, &msg.signature).await,
+            // message::Msg::CheckPointMsg(msg_without_sig)=> gc::do_check_point(msg_without_sig, server_mutex, msg.signature).await,
             _ => {
                 log::info!("no match type, stop process this message");
             }

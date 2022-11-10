@@ -10,6 +10,8 @@ use p256::EncodedPoint;
 use rand_core::OsRng;
 use serde::{Serialize, Deserialize};
 use p256::ecdsa::signature::{Signer, Signature, Verifier};
+use ring::digest;
+
 
 // generate client and servers key pair, and store them in key_pairs
 pub fn generate_key_pairs() {
@@ -81,12 +83,12 @@ pub fn sign_msg(private_key: &SigningKey, content: &[u8]) -> Vec<u8> {
 
 // get checksum
 pub fn sha256(msg: &[u8]) -> Vec<u8> {
-    use ring::digest;
     let mut ctx = digest::Context::new(&digest::SHA256);
     ctx.update(msg);
     let multi_part = ctx.finish();
     Vec::<u8>::from(multi_part.as_ref())
 }
+
 
 pub fn verify_sig(public_key: &VerifyingKey, msg: &[u8], signed_value: &[u8]) -> bool {
 
@@ -113,13 +115,25 @@ pub fn verify_sig(public_key: &VerifyingKey, msg: &[u8], signed_value: &[u8]) ->
 mod tests {
     use std::time::UNIX_EPOCH;
 
+    use serde_json::json;
+
     use crate::{network::message, constants, cryptography::{sign_msg, verify_sig, load_private_key}};
+
+    use super::sha256;
 
     #[test]
     fn generate_key_pairs_test() {
         super::generate_key_pairs();
     }
 
+    #[test]
+    fn sha256_to_json_string() {
+        let msg = "nihao aaaaaaa";
+        let sha = sha256(&bincode::serialize(&msg).unwrap());
+        let s = json!(sha).to_string();
+        print!("{}", s);
+    }
+    
     #[test]
     fn sign_verify_test() {
         // simulate I am 0 server, receive client0's client request
