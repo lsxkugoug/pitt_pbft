@@ -12,11 +12,11 @@ use crate::{network::message, consensus::model::*, consensus::view_change,consta
 use tokio::time::{sleep, Duration};
 
 
-pub async fn do_client_request(client_msg: message::ClientMsg, server_mutex: Arc<Mutex<Server>>, client_sig: &Vec<u8>, msg_sig: &Vec<u8>) {
+pub async fn do_client_request(client_msg: message::ClientMsg, server_mutex: Arc<Mutex<Server>>, client_sig: &Vec<u8>) {
     let mut who_leader = usize::max_value();
     {
         let mut server = server_mutex.lock().unwrap(); 
-        if !check_client_request(&client_msg, msg_sig, &mut server){
+        if !check_client_request(&client_msg, client_sig, &mut server){
             return ;
         };
         server.client_request[client_msg.who_send] = (client_msg.time_stamp.clone(), constants::LOG_ENTRY_INIT);
@@ -70,7 +70,7 @@ pub async fn do_client_request(client_msg: message::ClientMsg, server_mutex: Arc
 
 // only for leader process client_request (1) generate pre-prepare msg and store it into log (2) broadcast pp_msg to all servers
 pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mutex: Arc<Mutex<Server>>, client_sig: &Vec<u8>) {
-    let new_log: model::LogEntry = Default::default();
+    let new_log: LogEntry = Default::default();
     let mut v = -1;
     let mut n = -1;
     // 1. generate pre-prepare msg and store it into log 
@@ -81,7 +81,7 @@ pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mut
             todo!()
         }
         // 2. generate log  
-        let mut new_log = model::LogEntry {
+        let mut new_log = LogEntry {
             entry_status: constants::PRE_PREPARED,
             client_msg: Some(client_msg.clone()),
             client_msg_checksum: message::get_client_msg_sha256(&client_msg),
@@ -109,7 +109,7 @@ pub async fn leader_do_client_request(client_msg: message::ClientMsg, server_mut
     let pp_msg = message::PrePrepareMsg {
         msg_type: constants::PRE_PREPARE,
         client_msg: client_msg,
-        client_msg_sig: client_sig,
+        client_msg_sig: client_sig.clone(),
         who_send: constants::get_i_am(),
         v: v,
         n: n,

@@ -221,6 +221,7 @@ new_view_msg {
     msg_type: int
     view: int
     VC_certificate: vec<vc_msg>
+    state_set: Vec<state>
 }
 ```
 
@@ -321,7 +322,7 @@ caculate_new_view() {
             if failed check signature:
                 success = False
                 break
-            quorum_cp.append(rt.last_applied_seq / L * L)
+            quorum_cp.append(rt.last_applied_seq / K * K)
         }
         sort(quorum_cp, reverse)
         if msg.last_stable_sq != quorum_cp[f + 1]:

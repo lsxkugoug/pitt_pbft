@@ -72,8 +72,8 @@ pub struct VcMsg {
     pub v: i32,
     pub who_send: usize,
     pub last_stable_sq: i32,
-    pub stable_certificates: Vec<(RtMsg, Vec<u8>)>, // used to verify latgest stable squence number
-    pub prepared_set: Vec<LogEntry> ,
+    pub stable_certificates: Vec<Option<(RtMsg, Vec<u8>)>>, // used to verify latgest stable squence number
+    pub prepared_set: Vec<StateEntry> ,
 
 }
 
@@ -81,7 +81,8 @@ pub struct VcMsg {
 pub struct  NewViewMsg {
     pub mst_type: i32,
     pub v: i32,
-    pub vc_certificate: Vec<(VcMsg, Vec<u8>)>
+    pub vc_certificate: Vec<Option<(VcMsg, Vec<u8>)>>,
+    pub state_set: Vec<Option<StateEntry>>,
 }
 
 // 5. retransmition msg

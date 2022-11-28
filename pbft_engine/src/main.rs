@@ -1,4 +1,4 @@
-use pbft_engine::{consensus::three_normal, consensus::check_msg, consensus::model, config, cmd, network::{message, self}, constants, network::msg_rt, checkpoint_gc::*};
+use pbft_engine::{consensus::three_normal, consensus::model, config, cmd, network::{message, self}, constants, network::msg_rt, checkpoint_gc::*};
 use clap::Parser;
 use std::sync::{Arc,Mutex};
 use tokio::net::{TcpListener, TcpStream};
@@ -69,7 +69,6 @@ async fn main() {
         let server_mutex_pro = Arc::clone(&server_mutex);
         tokio::spawn(async move {
             preprocess_route(socket, server_mutex_pro).await;
-
         });
         // note: this tokio should not use join or await, since it wrapped by a loop, the tasks of sub thread must complete
     }
@@ -111,20 +110,19 @@ async fn preprocess_route(socket: TcpStream, server_mutex: Arc<Mutex<model::Serv
 
 
         // 3. process the job
-        match msg.msg_without_sig {
-            message::Msg::ClientMsg(msg_without_sig) => {
-                three_normal::do_client_request(msg_without_sig, server_mutex, &msg.signature, &msg.signature).await;
-            },
-            message::Msg::PrePrepareMsg(msg_without_sig)=> three_normal::do_pre_prepare(msg_without_sig, server_mutex,&msg.signature).await,
-            message::Msg::PrepareMsg(msg_without_sig)=> three_normal::do_prepare(msg_without_sig, server_mutex, &msg.signature).await,
-            message::Msg::CommitMsg(msg_without_sig)=> three_normal::do_commit(msg_without_sig, server_mutex, &msg.signature).await,
-            message::Msg::VcMsg(msg_without_sig)=> todo!(),
-            message::Msg::RtMsg(msg_without_sig)=> msg_rt::do_rt(msg_without_sig, server_mutex, &msg.signature).await,
-            // message::Msg::CheckPointMsg(msg_without_sig)=> gc::do_check_point(msg_without_sig, server_mutex, msg.signature).await,
-            _ => {
-                log::info!("no match type, stop process this message");
-            }
-        }
+        // match msg.msg_without_sig {
+        //     message::Msg::ClientMsg(msg_without_sig) => {
+        //         three_normal::do_client_request(msg_without_sig, server_mutex, &msg.signature, &msg.signature).await;
+        //     },
+        //     message::Msg::PrePrepareMsg(msg_without_sig)=> three_normal::do_pre_prepare(msg_without_sig, server_mutex,&msg.signature).await,
+        //     message::Msg::PrepareMsg(msg_without_sig)=> three_normal::do_prepare(msg_without_sig, server_mutex, &msg.signature).await,
+        //     message::Msg::CommitMsg(msg_without_sig)=> three_normal::do_commit(msg_without_sig, server_mutex, &msg.signature).await,
+        //     message::Msg::VcMsg(msg_without_sig)=> todo!(),
+        //     message::Msg::RtMsg(msg_without_sig)=> msg_rt::do_rt(msg_without_sig, server_mutex, &msg.signature).await,
+        //     _ => {
+        //         log::info!("no match type, stop process this message");
+        //     }
+        // }
     
 }
 

@@ -32,8 +32,18 @@ pub async  fn period_rt(server_mutex: Arc<Mutex<model::Server>>) {
                 log_entry_status_set: log_entry_status_set,
                 low_water: server.get_h(),
             });
+            // update server.rts which is used by view change
+            if server.rts[constants::get_i_am()].is_some() && 
+                rt_msg.as_ref().unwrap().last_applied_seq > server.rts[constants::get_i_am()].as_ref().unwrap().0.last_applied_seq {
+                    server.rts[constants::get_i_am()] = Some((
+                        rt_msg.as_ref().unwrap().clone(),
+                        cryptography::sign_msg(&constants::get_my_prikey().unwrap(),&bincode::serialize(rt_msg.as_ref().unwrap()).unwrap()),
+                    ));
+                }
         }
 
+        // update server.rts
+    
         broadcast_servers(Msg::RtMsg(rt_msg.unwrap())).await;
         
         sleep(Duration::from_millis(config::RT_RCV as u64)).await;

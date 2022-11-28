@@ -5,25 +5,6 @@ use std::{sync::{Arc,Mutex, MutexGuard}, time::{SystemTime, UNIX_EPOCH}};
 
 use crate::{network::message, consensus::model::*, constants, config, cryptography, network::msg_rt};
 
-
-// pub fn check_msg(msg_with_sig: &message::MsgWithSignature, server_mutex: &Arc<Mutex<model::Server>>) ->bool {
-//     let signature = &msg_with_sig.signature;
-//     match &msg_with_sig.msg_without_sig {
-//         message::Msg::ClientMsg(msg_without_sig) => {
-//             check_client_request(&msg_without_sig, signature, server_mutex)
-//         },
-//         message::Msg::PrePrepareMsg(msg_without_sig) => check_pre_prepare(msg_without_sig, signature, server_mutex),
-//         message::Msg::PrepareMsg(msg_without_sig) => check_prepare(msg_without_sig, signature, server_mutex),
-//         message::Msg::CommitMsg(msg_without_sig) => check_commit(msg_without_sig, signature, server_mutex),
-//         message::Msg::VcMsg(msg_without_sig) => todo!(),
-//         message::Msg::RtMsg(msg_without_sig) => check_rt(msg_without_sig, signature, server_mutex),
-//         message::Msg::ClientReplyMsg(msg_without_sig) => false,
-//         message::Msg::NewViewMsg(msg_without_sig) => todo!(),
-//         message::Msg::RtRplMsg(msg_without_sig) => todo!(),
-//     }
-// }
-
-
 pub fn check_client_request(msg_without_sig: &message::ClientMsg, signature: &Vec<u8>, server: &mut MutexGuard<Server>) -> bool {
     let mut result = true;
     let client = msg_without_sig.who_send;
@@ -150,23 +131,29 @@ pub fn check_rt(msg_without_sig: &message::RtMsg, signature: &Vec<u8>, server: &
     result
 }
 
-pub fn check_vc(msg_without_sig: &message::VcMsg, signature: Vec<u8>, server_mutex: &Arc<Mutex<Server>>) -> bool {
-    todo!();
+pub fn check_vc(msg_without_sig: &message::VcMsg, server: &mut MutexGuard<Server>, signature: &Vec<u8>) -> bool {
     let mut result = true;
     // 1. check signature
-    // result = result && cryptography::verify_sig(&constants::get_server_pub(msg_without_sig.who_send).unwrap(), 
-    //                                         &bincode::serialize(&msg_without_sig).unwrap(), signature);
-    // {
-    //     let server = server_mutex.lock().unwrap();
-    //     result = result && server.new_view == msg_without_sig.v && !server.vc_vote[msg_without_sig.who_send];
-    //     result = result && server.vc_num <= config::F_NUM * 2;
-    //     result = result && msg_without_sig.prepared_set.len() <= config::L; // avoid too large malicious msg
-    //     result = result &&  msg_without_sig.v == server.my_view ;
-    //     // check wether all of prepared msg's v < msg.view
-    //     for msg in msg_without_sig.prepared_set.iter() {
-    //         // result = result &&  *ms
-    //     }
-    // }
+    result = result && cryptography::verify_sig(&constants::get_server_pub(msg_without_sig.who_send).unwrap(), 
+                                            &bincode::serialize(&msg_without_sig).unwrap(), signature);
+    
+    // 2. check stable_certificates and last_applied
+    let mut tmp_apl = Vec::new();
+    for rt in msg_without_sig.stable_certificates {
+        if rt.is_none() {
+            continue;
+        }
+        result && cryptography::verify_sig(&constants::get_server_pub(rt.unwrap().0.who_send).unwrap(), 
+        &bincode::serialize(&rt.unwrap().0).unwrap(), &rt.unwrap().1);
+        tmp_apl.push(rt.unwrap().0.last_applied_seq);
+        tmp_apl.sort_by(|a, b| b.cmp(a));
+        if tmp_apl.len() < config::F_NUM as usize + 1 {
+            return false;
+        }
+    }
+    result = result && tmp_apl[config::F_NUM as usize] == msg_without_sig.last_stable_sq;
+    
+
     result
 }
 
@@ -176,6 +163,7 @@ pub fn check_rt_rpl(msg_without_sig: &message::RtRplMsg, signature: &Vec<u8>, se
     result = result && cryptography::verify_sig(&constants::get_server_pub(msg_without_sig.who_send).unwrap(), 
                                             &bincode::serialize(&msg_without_sig).unwrap(), signature);
 
-    // some check code in do_ function
+    // 2. check 
+    // msg_without_sig
     return result
 }

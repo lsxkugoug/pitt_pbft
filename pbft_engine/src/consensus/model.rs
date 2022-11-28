@@ -13,13 +13,13 @@ use serde_json::{json, Map};
 #[derive(Serialize, Deserialize)]
 pub struct StateEntry {
     pub client_msg: Option<message::ClientMsg>,     // Initialy all slot's client msg == None
+    pub client: usize,// client's number
     pub v: i32,     // view number
     pub n: i32,     // sequence number
-    pub client: usize,// client's number
 }
 impl StateEntry {
     pub fn generate_log_entry_commited(&self) ->LogEntry {
-        let log_entry = LogEntry::default();
+        let mut log_entry = LogEntry::default();
         log_entry.client_msg = self.client_msg.clone();
         log_entry.v = self.v;
         log_entry.n = self.n;
@@ -28,7 +28,7 @@ impl StateEntry {
         log_entry
     }
     pub fn generate_log_entry_pp(&self) ->LogEntry {
-        let log_entry = LogEntry::default();
+        let mut log_entry = LogEntry::default();
         log_entry.client_msg = self.client_msg.clone();
         log_entry.v = self.v;
         log_entry.n = self.n;
@@ -96,7 +96,6 @@ impl LogEntry {
 // the constants veriable would stored in constants
 pub struct Server {
     // normal variables
-	// pub I_am: i32,                                     // Identification of server
     pub status: i32,                                    // normal, view-change, if view-change, only receive vc related msg                                     
 	pub client_request:  Vec<(String, i32)>,            // (timestemp, status) used to maintain one semantic
     pub my_view: i32,
@@ -109,7 +108,8 @@ pub struct Server {
 
     // view change variable
     pub timeout: u64,
-    pub vc_msgs: Vec<Option<VcMsg>>,
+    pub vc_msgs: Vec<Option<(VcMsg, Vec<u8>)>>,           // vc_msg and its signature
+    pub vc_num: i32,
     pub rts: Vec<Option<(RtMsg, Vec<u8>)>>,                       // with sig used to verify largest stable checkpoint in VC msg
     pub new_view: Option<NewViewMsg>,
     
@@ -149,8 +149,9 @@ impl Default for Server {
             restore_state_vote: HashMap::new(),
             restore_pp: HashMap::new(),
             restore_pp_vote: HashMap::new(),
-            last_new_view: NewViewMsg{ mst_type: constants::NEW_VIEW, v: 0, vc_certificate: Vec::<(VcMsg, Vec<u8>)>::new()},
-            last_vc: VcMsg{ msg_type: constants::VIEW_CHANGE, v: 0, who_send: constants::get_i_am(), last_stable_sq: -1, stable_certificates: Vec::<(RtMsg, Vec<u8>)>::new(), prepared_set: Vec::<LogEntry>::new()},
+            last_new_view: NewViewMsg{ mst_type: constants::NEW_VIEW, v: 0, vc_certificate: Vec::<(VcMsg, Vec<u8>)>::new(), state_set: Vec::new() },
+            last_vc: VcMsg{ msg_type: constants::VIEW_CHANGE, v: 0, who_send: constants::get_i_am(), last_stable_sq: -1, stable_certificates: Vec::<Option<(RtMsg, Vec<u8>)>>::new(), prepared_set: Vec::<LogEntry>::new()},
+            vc_num: 0,
             }
     }
 
